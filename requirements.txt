@@ -14,3 +14,5 @@ pydantic
 sentence-transformers
 llama-cpp-python
 fastembed
+
+# what is the impact of brexit on economy?

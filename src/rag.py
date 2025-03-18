@@ -357,7 +357,7 @@ class GraphState(BaseModel):
     final_response: Optional[str] = None
 
 def query_analysis_node(state):
-    query = state["query"]
+    query = state.dict().get("query")
     analysis_result = analyze_query(query)
     return {"query_analysis": analysis_result.dict()}
 
@@ -388,10 +388,18 @@ def final_response_node(state):
     return {"final_response": final_response}
 
 def direct_llm_node(state):
-    return {"final_response": generate_response_without_context(state["query"])}
+    return {"final_response": generate_response_without_context(state.query)}
 
 def should_use_rag(state):
-    analysis_result = QueryAnalysisResult(**state["query_analysis"])
+    if "query_analysis" in state:
+     analysis_result = QueryAnalysisResult(**state["query_analysis"])
+    else:
+     analysis_result = QueryAnalysisResult(
+        query_type="other",
+        reasoning="No analysis available",
+        related_keywords=[]
+    )
+
     if analysis_result.query_type == QueryType.OTHER:
         return "direct_llm"
     return "use_rag"

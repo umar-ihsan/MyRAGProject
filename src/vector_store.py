@@ -18,7 +18,8 @@ def create_faiss_vectorstore(documents, embeddings, save_path=FAISS_PATH):
 
 def load_faiss_vectorstore(embeddings, load_path=FAISS_PATH):
     """Load a FAISS vector store from disk."""
-    vector_store = FAISS.load_local(load_path, embeddings)
+    vector_store = FAISS.load_local(load_path, embeddings, allow_dangerous_deserialization=True)
+
     print(f"Vector store loaded from {load_path}")
     return vector_store
 
