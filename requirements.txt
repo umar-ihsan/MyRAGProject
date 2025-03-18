@@ -17,4 +17,3 @@ fastembed
 fastapi
 uvicorn
 
-# what is the impact of brexit on economy?
