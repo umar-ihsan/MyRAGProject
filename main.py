@@ -1,9 +1,18 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import Dict, List
 from src.mongodb_utils import connect_to_mongodb, get_articles_from_mongodb, convert_to_documents, split_documents
 from src.vector_store import initialize_embeddings, load_or_create_faiss_vectorstore
 from src.rag import run_rag_system
 
+# Initialize FastAPI
+app = FastAPI()
+
+# Store chat history per user (uses session_id as key)
+chat_history: Dict[str, List[str]] = {}
+
+# Setup MongoDB and FAISS at startup
 def setup_documents():
-    # Set your MongoDB connection details here:
     connection_string = "mongodb+srv://jamshidjunaid763:JUNAID12345@insightwirecluster.qz5cz.mongodb.net/?retryWrites=true&w=majority&appName=InsightWireCluster"
     database_name = "Scraped-Articles-11"
     collection_name = "Articles"
@@ -18,28 +27,41 @@ def setup_documents():
         print("MongoDB connection failed. Exiting.")
         return []
 
-def main():
-    print("Welcome to the local RAG system. Type 'exit' to quit.\n")
-    
-    # Setup documents and persistent vector store once at startup
-    document_chunks = setup_documents()
-    if not document_chunks:
-        print("No documents loaded. Exiting.")
-        return
+print("Initializing document store and vector database...")
+document_chunks = setup_documents()
+if not document_chunks:
+    raise RuntimeError("No documents loaded. Exiting.")
 
-    embeddings = initialize_embeddings()
-    vector_store = load_or_create_faiss_vectorstore(document_chunks, embeddings)
+embeddings = initialize_embeddings()
+vector_store = load_or_create_faiss_vectorstore(document_chunks, embeddings)
 
-    # Interactive query loop
-    while True:
-        query = input("Enter your query: ").strip()
-        if query.lower() in ['exit', 'quit']:
-            print("Exiting the RAG system. Goodbye!")
-            break
+# API request model
+class QueryRequest(BaseModel):
+    session_id: str  # Unique identifier for the user session
+    query: str
 
-        final_response = run_rag_system(query, vector_store)
-        print("\nFinal Response:")
-        print(final_response, "\n")
+@app.post("/query")
+async def query_rag(request: QueryRequest):
+    try:
+        session_id = request.session_id
 
-if __name__ == '__main__':
-    main()
+        # Retrieve past conversation history for this session
+        if session_id in chat_history:
+            past_conversation = " ".join(chat_history[session_id])
+        else:
+            past_conversation = ""
+            chat_history[session_id] = []
+
+        # Append the new query to history
+        full_query = f"{past_conversation} {request.query}".strip()
+        response = run_rag_system(full_query, vector_store)
+
+        # Store the latest query-response pair
+        chat_history[session_id].append(f"User: {request.query}")
+        chat_history[session_id].append(f"Bot: {response}")
+
+        return {"response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Run with: uvicorn main:app --reload
