@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, List
 from src.mongodb_utils import connect_to_mongodb, get_articles_from_mongodb, convert_to_documents, split_documents
@@ -7,6 +8,16 @@ from src.rag import run_rag_system
 
 # Initialize FastAPI
 app = FastAPI()
+
+
+# Allow all origins for testing (replace "*" with specific domains for production)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace "*" with ["https://your-frontend.com"] for production
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 # Store chat history per user (uses session_id as key)
 chat_history: Dict[str, List[str]] = {}

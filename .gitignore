@@ -11,3 +11,4 @@
 
 # But ignore __pycache__ inside src
 src/__pycache__/
+.vercel
