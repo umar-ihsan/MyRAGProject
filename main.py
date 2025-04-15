@@ -25,8 +25,8 @@ chat_history: Dict[str, List[str]] = {}
 # Setup MongoDB and FAISS at startup
 def setup_documents():
     connection_string = "mongodb+srv://jamshidjunaid763:JUNAID12345@insightwirecluster.qz5cz.mongodb.net/?retryWrites=true&w=majority&appName=InsightWireCluster"
-    database_name = "Scraped-Articles-11"
-    collection_name = "Articles"
+    database_name = "Scraped-Articles-10"
+    collection_name = "Articles2"
 
     client = connect_to_mongodb(connection_string)
     if client:
@@ -75,4 +75,4 @@ async def query_rag(request: QueryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Run with: uvicorn main:app --reload
+# uvicorn main:app --host 0.0.0.0 --port 8002 --reload
