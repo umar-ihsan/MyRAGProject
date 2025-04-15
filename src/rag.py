@@ -11,11 +11,13 @@ from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 from langgraph.graph import StateGraph, END
 
-# Set up Hugging Face API key (replace with your own key)
-HF_API_KEY = "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"
+# Import configuration
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import HF_API_KEY, HF_MODEL_NAME
 
 # Initialize the LLM client
-llm_client = InferenceClient(model="mistralai/Mistral-7B-Instruct-V0.3", token=HF_API_KEY)
+llm_client = InferenceClient(model=HF_MODEL_NAME, token=HF_API_KEY)
 
 def query_model(prompt):
     """Query the LLM model using the prompt."""

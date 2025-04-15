@@ -5,10 +5,22 @@ from typing import Dict, List
 from src.mongodb_utils import connect_to_mongodb, get_articles_from_mongodb, convert_to_documents, split_documents
 from src.vector_store import initialize_embeddings, load_or_create_faiss_vectorstore
 from src.rag import run_rag_system
+from config import (
+    MONGODB_CONNECTION_STRING,
+    MONGODB_DATABASE_NAME,
+    MONGODB_COLLECTION_NAME,
+    EMBEDDING_MODEL,
+    API_HOST,
+    API_PORT,
+    API_DEBUG
+)
+import os
 
 # Initialize FastAPI
 app = FastAPI()
 
+# Check if running on Vercel
+is_vercel = os.environ.get('VERCEL') == '1'
 
 # Allow all origins for testing (replace "*" with specific domains for production)
 app.add_middleware(
@@ -22,15 +34,14 @@ app.add_middleware(
 # Store chat history per user (uses session_id as key)
 chat_history: Dict[str, List[str]] = {}
 
+# Global vector store for reuse in serverless environment
+vector_store = None
+
 # Setup MongoDB and FAISS at startup
 def setup_documents():
-    connection_string = "mongodb+srv://jamshidjunaid763:JUNAID12345@insightwirecluster.qz5cz.mongodb.net/?retryWrites=true&w=majority&appName=InsightWireCluster"
-    database_name = "Scraped-Articles-10"
-    collection_name = "Articles2"
-
-    client = connect_to_mongodb(connection_string)
+    client = connect_to_mongodb(MONGODB_CONNECTION_STRING)
     if client:
-        articles = get_articles_from_mongodb(client, database_name, collection_name)
+        articles = get_articles_from_mongodb(client, MONGODB_DATABASE_NAME, MONGODB_COLLECTION_NAME)
         documents = convert_to_documents(articles)
         document_chunks = split_documents(documents)
         return document_chunks
@@ -38,13 +49,23 @@ def setup_documents():
         print("MongoDB connection failed. Exiting.")
         return []
 
-print("Initializing document store and vector database...")
-document_chunks = setup_documents()
-if not document_chunks:
-    raise RuntimeError("No documents loaded. Exiting.")
+# Initialize embeddings and vector store - lazy loading for serverless
+def get_vector_store():
+    global vector_store
+    if vector_store is None:
+        print("Initializing document store and vector database...")
+        document_chunks = setup_documents()
+        if not document_chunks:
+            raise RuntimeError("No documents loaded. Exiting.")
+        
+        embeddings = initialize_embeddings(EMBEDDING_MODEL)
+        vector_store = load_or_create_faiss_vectorstore(document_chunks, embeddings)
+    return vector_store
 
-embeddings = initialize_embeddings()
-vector_store = load_or_create_faiss_vectorstore(document_chunks, embeddings)
+# Only initialize immediately if not on Vercel (for local dev)
+if not is_vercel:
+    print("Local environment detected, initializing...")
+    vector_store = get_vector_store()
 
 # API request model
 class QueryRequest(BaseModel):
@@ -54,6 +75,9 @@ class QueryRequest(BaseModel):
 @app.post("/query")
 async def query_rag(request: QueryRequest):
     try:
+        # Get vector store (lazy load on first request in serverless)
+        vs = get_vector_store()
+        
         session_id = request.session_id
 
         # Retrieve past conversation history for this session
@@ -65,7 +89,7 @@ async def query_rag(request: QueryRequest):
 
         # Append the new query to history
         full_query = f"{past_conversation} {request.query}".strip()
-        response = run_rag_system(full_query, vector_store)
+        response = run_rag_system(full_query, vs)
 
         # Store the latest query-response pair
         chat_history[session_id].append(f"User: {request.query}")
@@ -75,4 +99,11 @@ async def query_rag(request: QueryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+@app.get("/")
+async def root():
+    return {"message": "RAG API is running! Send POST requests to /query endpoint."}
+
+# Only needed for local development
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host=API_HOST, port=int(API_PORT), reload=API_DEBUG)

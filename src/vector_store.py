@@ -2,10 +2,12 @@ import os
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS, Chroma
 
-# Path for persistent FAISS vector store
-FAISS_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'faiss_index')
+# Import configuration
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import FAISS_PATH, EMBEDDING_MODEL
 
-def initialize_embeddings(model="sentence-transformers/all-MiniLM-L6-v2"):
+def initialize_embeddings(model=EMBEDDING_MODEL):
     """Initialize and return the HuggingFaceEmbeddings model."""
     return HuggingFaceEmbeddings(model_name=model)
 

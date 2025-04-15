@@ -16,4 +16,5 @@ llama-cpp-python
 fastembed
 fastapi
 uvicorn
+python-dotenv
 
